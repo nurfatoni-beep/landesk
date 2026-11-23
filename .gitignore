@@ -1,0 +1,16 @@
+# hasil build
+dist/
+build/
+packaging/icon.png
+packaging/icon.ico
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# lain-lain
+*.log
+desktop.ini
+.DS_Store

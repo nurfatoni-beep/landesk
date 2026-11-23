@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LanDesk
+GenericName=Remote Desktop
+Comment=Kontrol komputer lain atau izinkan komputer ini dikontrol, lewat jaringan lokal
+Exec=landesk
+Icon=landesk
+Terminal=false
+StartupWMClass=LanDesk
+Categories=Network;RemoteAccess;
+Keywords=remote;desktop;vnc;lan;rustdesk;

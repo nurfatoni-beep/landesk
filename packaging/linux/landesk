@@ -1,0 +1,4 @@
+#!/bin/sh
+# Launcher LanDesk (dipasang ke /usr/bin/landesk oleh paket .deb)
+export PYTHONPATH="/opt/landesk/vendor${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 /opt/landesk/server.py "$@"

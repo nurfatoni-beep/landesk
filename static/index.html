@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="id" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>LanDesk</title>
+<link rel="icon" href="/static/icon.png">
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --panel2: #1f232c; --line: #2a2f3a; --text: #e6e8ee; --muted: #8b93a7;
+    --accent: #4f8cff; --bad: #ff5c6c; --good: #3ecf8e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  button, input, select { font: inherit; color: inherit; }
+
+  /* Login */
+  #login { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; }
+  .card { width: min(360px, 100%); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 24px; }
+  .card h1 { margin: 0 0 4px; font-size: 20px; }
+  .card p { margin: 0 0 18px; color: var(--muted); }
+  .card label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 12px; }
+  .card input[type=password] { width: 100%; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); outline: none; }
+  .card input:focus { border-color: var(--accent); }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 13px; }
+  .btn { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: #222632; cursor: pointer; }
+  .btn:hover { border-color: #3a4152; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .card .btn.primary { width: 100%; margin-top: 18px; padding: 10px 14px; }
+  #err { color: var(--bad); min-height: 20px; margin-top: 10px; font-size: 13px; }
+  #busy { position: fixed; inset: 0; display: none; place-items: center; text-align: center; color: var(--muted); }
+  #busy b { display: block; color: var(--text); font-size: 18px; margin-bottom: 6px; }
+
+  /* Viewer */
+  #viewer { position: fixed; inset: 0; display: none; }
+  #stage { position: absolute; inset: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  #stage.native { overflow: auto; display: block; }
+  #stage.drop::after { content: "Lepas file untuk mengirim ke host"; position: absolute; inset: 12px;
+    border: 2px dashed var(--accent); border-radius: 12px; display: grid; place-items: center;
+    background: rgba(79,140,255,.12); font-size: 18px; pointer-events: none; }
+  canvas#screen { display: block; background: #000; touch-action: none; outline: none; cursor: default; }
+
+  #bar { position: absolute; top: 0; left: 50%; transform: translate(-50%, -100%); transition: transform .15s;
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: calc(100vw - 16px);
+    background: rgba(24,27,34,.97); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px;
+    padding: 8px 10px; z-index: 10; }
+  #bar.show, #bar.pin { transform: translate(-50%, 0); }
+  #bar .btn { padding: 5px 10px; font-size: 13px; }
+  #bar label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  #bar select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; max-width: 190px; }
+  #bar input[type=range] { width: 80px; }
+  #stats { font: 12px ui-monospace, Consolas, monospace; color: var(--muted); padding: 0 6px; white-space: nowrap; }
+  #stats b { color: var(--good); font-weight: 600; }
+  #hostname { font-weight: 600; padding: 0 4px; white-space: nowrap; }
+  #handle { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 140px; height: 10px; z-index: 9; }
+  #handle::after { content: ""; position: absolute; left: 45px; right: 45px; top: 3px; height: 4px;
+    border-radius: 3px; background: rgba(255,255,255,.3); }
+  .menu { position: relative; }
+  .menu > .items { display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 180px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px; z-index: 20; }
+  .menu.open > .items { display: block; }
+  .menu .items button { display: block; width: 100%; text-align: left; background: none; border: 0;
+    padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .menu .items button:hover { background: var(--panel2); }
+
+  .dialog { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); z-index: 11; display: none;
+    width: min(480px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; }
+  .dialog textarea { width: 100%; height: 120px; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px; resize: vertical; color: var(--text); }
+  .dialog .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
+  /* Panel file */
+  #files { position: absolute; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); background: var(--panel);
+    border-left: 1px solid var(--line); z-index: 12; display: none; flex-direction: column; }
+  #files.open { display: flex; }
+  #files header { display: flex; align-items: center; gap: 6px; padding: 10px; border-bottom: 1px solid var(--line); }
+  #files header b { flex: 1; }
+  #fpath { display: flex; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  #fpath input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 5px 8px; font: 12px ui-monospace, Consolas, monospace; }
+  #fpath select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
+  #flist { flex: 1; overflow: auto; padding: 4px 0; }
+  .fitem { display: flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: default; font-size: 13px; }
+  .fitem:hover { background: var(--panel2); }
+  .fitem .ic { width: 18px; text-align: center; opacity: .8; }
+  .fitem .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fitem .sz { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .fitem a { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .fitem.dir { cursor: pointer; }
+  #files footer { padding: 10px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+  #files footer span { flex: 1; color: var(--muted); font-size: 12px; }
+  #fprog { height: 3px; background: var(--accent); width: 0; transition: width .1s; }
+
+  #toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; z-index: 30; display: none; max-width: 90vw; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <form class="card" id="loginForm" autocomplete="off">
+    <h1>LanDesk</h1>
+    <p>Remote desktop di jaringan lokal</p>
+    <label for="pw">Password host</label>
+    <input id="pw" type="password" autofocus placeholder="lihat di aplikasi LanDesk host">
+    <div class="row"><input type="checkbox" id="remember"><label for="remember" style="margin:0">Ingat password di browser ini</label></div>
+    <button class="btn primary" type="submit">Hubungkan</button>
+    <div id="err"></div>
+  </form>
+</div>
+
+<div id="busy"><div><b id="busyTitle">Menghubungkan...</b><span id="busySub"></span></div></div>
+
+<div id="viewer">
+  <div id="handle"></div>
+  <div id="bar">
+    <span id="hostname"></span>
+    <span id="stats">-</span>
+    <label id="monWrap">Monitor <select id="mon"></select></label>
+    <label>Kualitas <input type="range" id="q" min="20" max="95" step="5"></label>
+    <label>FPS <select id="fps"><option>10</option><option>15</option><option>24</option><option>30</option><option>45</option><option>60</option></select></label>
+    <label>Skala <select id="scale"><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option></select></label>
+    <div class="menu" id="keysMenu">
+      <button class="btn" id="keysBtn" title="Kirim kombinasi tombol khusus">Tombol &#9662;</button>
+      <div class="items">
+        <button data-k="Meta">Tombol Windows / Super</button>
+        <button data-k="Alt+Tab">Alt + Tab</button>
+        <button data-k="Alt+F4">Alt + F4</button>
+        <button data-k="Control+Shift+Escape">Ctrl + Shift + Esc</button>
+        <button data-k="Meta+d">Win + D (desktop)</button>
+        <button data-k="Meta+e">Win + E (explorer)</button>
+        <button data-k="Meta+r">Win + R (run)</button>
+        <button data-k="PrintScreen">Print Screen</button>
+        <button data-k="Control+Alt+t">Ctrl + Alt + T (terminal Linux)</button>
+      </div>
+    </div>
+    <button class="btn" id="filesBtn" title="Transfer file">File</button>
+    <button class="btn" id="typeBtn" title="Ketik teks ke host">Ketik teks</button>
+    <button class="btn" id="fitBtn" title="Fit ke jendela / ukuran asli">Fit</button>
+    <button class="btn" id="fsBtn">Fullscreen</button>
+    <button class="btn" id="pinBtn" title="Tampilkan toolbar terus">&#128204;</button>
+    <button class="btn" id="discBtn">Putus</button>
+  </div>
+  <div id="stage"><canvas id="screen" tabindex="0"></canvas></div>
+
+  <div class="dialog" id="typebox">
+    <textarea id="typeText" placeholder="Teks ini akan diketik di komputer host"></textarea>
+    <div class="actions">
+      <button class="btn" id="typeCancel">Batal</button>
+      <button class="btn primary" id="typeSend">Ketik di host</button>
+    </div>
+  </div>
+
+  <aside id="files">
+    <header><b>File di host</b><button class="btn" id="fClose">Tutup</button></header>
+    <div id="fpath">
+      <select id="froots" title="Drive"></select>
+      <button class="btn" id="fUp" title="Folder atas">&#8593;</button>
+      <input id="fPathInput" spellcheck="false">
+      <button class="btn" id="fGo">Buka</button>
+    </div>
+    <div id="fprog"></div>
+    <div id="flist"></div>
+    <footer>
+      <span id="fInfo">Tarik file ke layar untuk mengirim ke folder ini</span>
+      <input type="file" id="fPick" multiple hidden>
+      <button class="btn primary" id="fUpload">Kirim file...</button>
+    </footer>
+  </aside>
+  <div id="toast"></div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('screen'), ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+  const stage = $('stage'), bar = $('bar');
+  let ws = null, info = null, fit = true, viewOnly = false, everConnected = false;
+
+  // ---------- storage (aman kalau diblokir) ----------
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+  };
+  const saved = store.get('landesk.pw');
+  if (saved) { $('pw').value = saved; $('remember').checked = true; }
+
+  function toast(msg, ms = 2200) {
+    const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms);
+  }
+  function show(which, title, sub) {
+    $('login').style.display = which === 'login' ? 'grid' : 'none';
+    $('busy').style.display = which === 'busy' ? 'grid' : 'none';
+    $('viewer').style.display = which === 'viewer' ? 'block' : 'none';
+    if (which === 'busy') { $('busyTitle').textContent = title || ''; $('busySub').textContent = sub || ''; }
+  }
+
+  // ---------- koneksi ----------
+  $('loginForm').addEventListener('submit', (e) => { e.preventDefault(); connect({ password: $('pw').value }); });
+
+  // Token sekali pakai dari aplikasi LanDesk (?t=...) -> login otomatis, lalu hapus dari URL
+  const qs = new URLSearchParams(location.search);
+  const urlToken = qs.get('t');
+  if (urlToken) {
+    history.replaceState(null, '', location.pathname);
+    connect({ token: urlToken });
+  } else {
+    show('login');
+  }
+
+  function connect(auth) {
+    $('err').textContent = '';
+    show('busy', 'Menghubungkan...', location.host);
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    let failed = false;
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', ...auth }));
+    ws.onmessage = (ev) => {
+      if (typeof ev.data !== 'string') return queueFrame(ev.data);
+      const m = JSON.parse(ev.data);
+      if (m.t === 'auth_fail') {
+        failed = true;
+        $('err').textContent = auth.token ? 'Token kedaluwarsa, masukkan password.' : 'Password salah.';
+      } else if (m.t === 'rejected') {
+        failed = true; $('err').textContent = 'Koneksi ditolak oleh pengguna di komputer host.';
+      } else onText(m, auth);
+    };
+    ws.onclose = () => {
+      const was = !!info;
+      info = null; ws = null;
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      if (was) { show('busy', 'Koneksi terputus', 'Tutup jendela ini atau muat ulang untuk login lagi.'); setTimeout(() => show('login'), 1500); }
+      else { if (!failed && !$('err').textContent) $('err').textContent = 'Tidak bisa terhubung ke host.'; show('login'); }
+    };
+  }
+
+  function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+  function onText(m, auth) {
+    if (m.t === 'waiting') {
+      show('busy', 'Menunggu persetujuan...', 'Pengguna di komputer host perlu menerima koneksi ini.');
+    } else if (m.t === 'hello') {
+      info = m; viewOnly = m.view_only; everConnected = true;
+      if (auth.password != null) store.set('landesk.pw', $('remember').checked ? auth.password : null);
+      document.title = `${m.host} - LanDesk`;
+      $('hostname').textContent = m.host;
+      $('q').value = m.quality; $('fps').value = String(m.fps); $('scale').value = String(m.scale);
+      const mon = $('mon'); mon.innerHTML = '';
+      for (const it of m.monitors || []) {
+        const o = document.createElement('option'); o.value = it.index == null ? '' : it.index; o.textContent = it.label; mon.appendChild(o);
+      }
+      mon.value = m.monitor == null ? '' : String(m.monitor);
+      $('monWrap').style.display = (m.monitors || []).length > 2 ? 'flex' : 'none';
+      $('filesBtn').style.display = m.files ? '' : 'none';
+      show('viewer');
+      canvas.focus();
+      toast(`Terhubung ke ${m.host} (${m.os}, ${m.width}x${m.height}${viewOnly ? ', hanya lihat' : ''})`, 3000);
+    } else if (m.t === 'screen') {
+      info.width = m.width; info.height = m.height; layout();
+    } else if (m.t === 'stats') {
+      $('stats').innerHTML = `<b>${m.fps}</b> fps · ${(m.kbps / 1000).toFixed(1)} Mbps · ${lastLatency} ms`;
+    } else if (m.t === 'clip') {
+      remoteClip(m.text);
+    }
+  }
+
+  // ---------- render frame ----------
+  // Format: u8 type=1, u16 fw, u16 fh, u16 count, lalu count x [u16 x,y,w,h, u32 len, jpeg]
+  let chain = Promise.resolve(), lastLatency = 0;
+  function queueFrame(buf) {
+    const t0 = performance.now();
+    chain = chain.then(() => drawFrame(buf)).catch((e) => console.warn(e)).then(() => {
+      lastLatency = Math.round(performance.now() - t0);
+      send({ t: 'ack' });
+    });
+  }
+  async function drawFrame(buf) {
+    const dv = new DataView(buf);
+    if (dv.getUint8(0) !== 1) return;
+    const fw = dv.getUint16(1, true), fh = dv.getUint16(3, true), n = dv.getUint16(5, true);
+    let off = 7;
+    const jobs = [];
+    for (let i = 0; i < n; i++) {
+      const x = dv.getUint16(off, true), y = dv.getUint16(off + 2, true);
+      const len = dv.getUint32(off + 8, true);
+      off += 12;
+      const blob = new Blob([new Uint8Array(buf, off, len)], { type: 'image/jpeg' });
+      off += len;
+      jobs.push(createImageBitmap(blob).then((bmp) => ({ x, y, bmp })));
+    }
+    const tiles = await Promise.all(jobs);
+    if (canvas.width !== fw || canvas.height !== fh) { canvas.width = fw; canvas.height = fh; layout(); }
+    for (const { x, y, bmp } of tiles) { ctx.drawImage(bmp, x, y); bmp.close(); }
+  }
+  function layout() {
+    if (!canvas.width) return;
+    const nw = info ? info.width : canvas.width, nh = info ? info.height : canvas.height;
+    if (fit) {
+      stage.classList.remove('native');
+      const s = Math.min(window.innerWidth / nw, window.innerHeight / nh);
+      canvas.style.width = Math.floor(nw * s) + 'px';
+      canvas.style.height = Math.floor(nh * s) + 'px';
+    } else {
+      stage.classList.add('native');
+      canvas.style.width = nw + 'px'; canvas.style.height = nh + 'px';
+    }
+  }
+  window.addEventListener('resize', layout);
+
+  // ---------- mouse / touch ----------
+  function norm(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+  }
+  let pendingMove = null;
+  (function flushMove() {
+    if (pendingMove) { send({ t: 'mm', ...pendingMove }); pendingMove = null; }
+    requestAnimationFrame(flushMove);
+  })();
+  canvas.addEventListener('pointermove', (e) => { if (!viewOnly) pendingMove = norm(e); });
+  canvas.addEventListener('pointerdown', (e) => {
+    canvas.focus(); closeMenus();
+    if (viewOnly) return;
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    pendingMove = null;
+    send({ t: 'md', b: e.button < 0 ? 0 : e.button, ...norm(e) });
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (viewOnly) return;
+    e.preventDefault();
+    pendingMove = null;
+    send({ t: 'mu', b: e.button < 0 ? 0 : e.button, ...norm(e) });
+  });
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  let wheelAccY = 0, wheelAccX = 0;
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (viewOnly) return;
+    const unit = e.deltaMode === 1 ? 3 : (e.deltaMode === 2 ? 0.1 : 100);
+    wheelAccY += e.deltaY / unit; wheelAccX += e.deltaX / unit;
+    const sy = Math.trunc(wheelAccY), sx = Math.trunc(wheelAccX);
+    if (sy || sx) { wheelAccY -= sy; wheelAccX -= sx; send({ t: 'wh', dx: sx, dy: -sy }); }
+  }, { passive: false });
+
+  // ---------- keyboard ----------
+  const downKeys = new Map();
+  canvas.addEventListener('keydown', (e) => {
+    e.preventDefault();
+    if (viewOnly || e.isComposing) return;
+    let k = e.key;
+    if (k === 'Unidentified' || k === 'Dead') return;
+    if (k.length === 1 && (e.ctrlKey || e.altKey || e.metaKey)) k = k.toLowerCase();
+    // Ctrl+V: kirim clipboard lokal dulu supaya yang di-paste di host = clipboard lokal
+    if (k === 'v' && (e.ctrlKey || e.metaKey)) pushLocalClip();
+    if (e.repeat && downKeys.has(e.code)) { send({ t: 'kd', k: downKeys.get(e.code) }); return; }
+    downKeys.set(e.code, k);
+    send({ t: 'kd', k });
+  });
+  canvas.addEventListener('keyup', (e) => {
+    e.preventDefault();
+    if (viewOnly) return;
+    const k = downKeys.get(e.code) ?? e.key;
+    downKeys.delete(e.code);
+    send({ t: 'ku', k });
+  });
+  function releaseAll() {
+    for (const k of downKeys.values()) send({ t: 'ku', k });
+    downKeys.clear();
+    send({ t: 'release_all' });
+  }
+  canvas.addEventListener('blur', releaseAll);
+  window.addEventListener('blur', releaseAll);
+
+  function sendCombo(combo) {
+    const keys = combo.split('+');
+    for (const k of keys) send({ t: 'kd', k });
+    for (const k of keys.slice().reverse()) send({ t: 'ku', k });
+  }
+
+  // ---------- clipboard sync ----------
+  let lastClip = null, pendingClip = null;
+  async function pushLocalClip() {
+    if (!info || !info.clipboard || viewOnly || !navigator.clipboard) return;
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t && t !== lastClip) { lastClip = t; send({ t: 'clip', text: t }); }
+    } catch {}
+  }
+  async function remoteClip(text) {
+    lastClip = text;
+    if (!document.hasFocus()) { pendingClip = text; return; }
+    try { await navigator.clipboard.writeText(text); toast('Clipboard host disalin ke komputer ini', 1500); }
+    catch { pendingClip = text; }
+  }
+  window.addEventListener('focus', async () => {
+    if (pendingClip != null) {
+      try { await navigator.clipboard.writeText(pendingClip); pendingClip = null; } catch {}
+    }
+    pushLocalClip();
+  });
+  setInterval(() => { if (document.hasFocus()) pushLocalClip(); }, 1500);
+
+  // ---------- toolbar ----------
+  let hideT;
+  function showBar() { bar.classList.add('show'); clearTimeout(hideT); }
+  function hideBarSoon() {
+    clearTimeout(hideT);
+    hideT = setTimeout(() => { if (!document.querySelector('.menu.open')) bar.classList.remove('show'); }, 700);
+  }
+  $('handle').addEventListener('pointerenter', showBar);
+  $('handle').addEventListener('click', showBar);
+  bar.addEventListener('pointerenter', showBar);
+  bar.addEventListener('pointerleave', hideBarSoon);
+  document.addEventListener('pointermove', (e) => { if (e.clientY < 6) showBar(); });
+  $('pinBtn').addEventListener('click', () => { bar.classList.toggle('pin'); canvas.focus(); });
+
+  $('q').addEventListener('change', (e) => send({ t: 'cfg', quality: +e.target.value }));
+  $('fps').addEventListener('change', (e) => send({ t: 'cfg', fps: +e.target.value }));
+  $('scale').addEventListener('change', (e) => send({ t: 'cfg', scale: +e.target.value }));
+  $('mon').addEventListener('change', (e) => { send({ t: 'cfg', monitor: e.target.value === '' ? null : +e.target.value }); canvas.focus(); });
+  $('fitBtn').addEventListener('click', () => { fit = !fit; $('fitBtn').textContent = fit ? 'Fit' : '1:1'; layout(); canvas.focus(); });
+  $('discBtn').addEventListener('click', () => { if (ws) ws.close(); });
+  $('fsBtn').addEventListener('click', async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(() => {});
+      } else await document.exitFullscreen();
+    } catch {}
+    canvas.focus();
+  });
+  document.addEventListener('fullscreenchange', () => {
+    $('fsBtn').textContent = document.fullscreenElement ? 'Keluar FS' : 'Fullscreen';
+    setTimeout(layout, 50);
+  });
+
+  function closeMenus() { document.querySelectorAll('.menu.open').forEach((m) => m.classList.remove('open')); }
+  $('keysBtn').addEventListener('click', (e) => { e.stopPropagation(); $('keysMenu').classList.toggle('open'); });
+  $('keysMenu').querySelectorAll('.items button').forEach((b) => b.addEventListener('click', () => {
+    if (!viewOnly) sendCombo(b.dataset.k);
+    closeMenus(); canvas.focus();
+  }));
+  document.addEventListener('click', (e) => { if (!e.target.closest('.menu')) closeMenus(); });
+
+  $('typeBtn').addEventListener('click', () => { $('typebox').style.display = 'block'; $('typeText').focus(); });
+  $('typeCancel').addEventListener('click', () => { $('typebox').style.display = 'none'; canvas.focus(); });
+  $('typeSend').addEventListener('click', () => {
+    const text = $('typeText').value;
+    if (text) send({ t: 'type', text });
+    $('typeText').value = ''; $('typebox').style.display = 'none'; canvas.focus();
+    toast('Teks dikirim');
+  });
+
+  // ---------- transfer file ----------
+  let fdir = '';
+  const fmtSize = (n) => n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB`
+    : n < 1073741824 ? `${(n / 1048576).toFixed(1)} MB` : `${(n / 1073741824).toFixed(2)} GB`;
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  async function loadDir(path) {
+    if (!info) return;
+    const r = await fetch(`/api/files?path=${encodeURIComponent(path || '')}`, { headers: { 'X-LanDesk-Token': info.ftoken } });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Gagal membuka folder'); return; }
+    fdir = d.path; $('fPathInput').value = d.path;
+    $('fUp').disabled = !d.parent; $('fUp').dataset.p = d.parent;
+    const roots = $('froots');
+    if (roots.options.length !== d.roots.length) {
+      roots.innerHTML = d.roots.map((x) => `<option>${esc(x)}</option>`).join('');
+    }
+    roots.style.display = d.roots.length > 1 ? '' : 'none';
+    const cur = d.roots.find((x) => d.path.toLowerCase().startsWith(x.toLowerCase())); if (cur) roots.value = cur;
+    const list = $('flist');
+    if (!d.entries.length) { list.innerHTML = '<div class="fitem"><span class="nm" style="color:var(--muted)">(folder kosong)</span></div>'; return; }
+    list.innerHTML = d.entries.map((e) => {
+      const full = d.path.replace(/[\\/]$/, '') + d.sep + e.name;
+      return e.dir
+        ? `<div class="fitem dir" data-p="${esc(full)}"><span class="ic">&#128193;</span><span class="nm">${esc(e.name)}</span></div>`
+        : `<div class="fitem"><span class="ic">&#128196;</span><span class="nm" title="${esc(e.name)}">${esc(e.name)}</span>
+           <span class="sz">${fmtSize(e.size)}</span>
+           <a href="/api/download?ft=${encodeURIComponent(info.ftoken)}&path=${encodeURIComponent(full)}" download>Unduh</a></div>`;
+    }).join('');
+    list.querySelectorAll('.fitem.dir').forEach((el) => el.addEventListener('click', () => loadDir(el.dataset.p)));
+  }
+  function uploadFiles(files) {
+    if (!info || !files.length) return;
+    if (viewOnly) { toast('Mode hanya lihat: tidak bisa mengirim file'); return; }
+    const fd = new FormData();
+    let total = 0;
+    for (const f of files) { fd.append('file', f, f.name); total += f.size; }
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/upload?path=${encodeURIComponent(fdir)}`);
+    xhr.setRequestHeader('X-LanDesk-Token', info.ftoken);
+    xhr.upload.onprogress = (e) => { $('fprog').style.width = (e.loaded / (e.total || total) * 100) + '%'; };
+    xhr.onload = () => {
+      $('fprog').style.width = '0';
+      try {
+        const d = JSON.parse(xhr.responseText);
+        if (xhr.status === 200) { toast(`${d.saved.length} file terkirim ke ${d.dir}`, 3000); if ($('files').classList.contains('open')) loadDir(d.dir); }
+        else toast(d.error || xhr.responseText || 'Upload gagal');
+      } catch { toast('Upload gagal'); }
+    };
+    xhr.onerror = () => { $('fprog').style.width = '0'; toast('Upload gagal'); };
+    toast(`Mengirim ${files.length} file (${fmtSize(total)})...`, 2000);
+    xhr.send(fd);
+  }
+  $('filesBtn').addEventListener('click', () => { $('files').classList.add('open'); loadDir(fdir); });
+  $('fClose').addEventListener('click', () => { $('files').classList.remove('open'); canvas.focus(); });
+  $('fUp').addEventListener('click', () => loadDir($('fUp').dataset.p));
+  $('fGo').addEventListener('click', () => loadDir($('fPathInput').value));
+  $('fPathInput').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') loadDir(e.target.value); });
+  $('froots').addEventListener('change', (e) => loadDir(e.target.value));
+  $('fUpload').addEventListener('click', () => $('fPick').click());
+  $('fPick').addEventListener('change', (e) => { uploadFiles([...e.target.files]); e.target.value = ''; });
+  // drag & drop file ke layar remote
+  let dragDepth = 0;
+  window.addEventListener('dragenter', (e) => { if (info && e.dataTransfer.types.includes('Files')) { e.preventDefault(); dragDepth++; stage.classList.add('drop'); } });
+  window.addEventListener('dragover', (e) => { if (info) e.preventDefault(); });
+  window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; stage.classList.remove('drop'); } });
+  window.addEventListener('drop', (e) => {
+    e.preventDefault(); dragDepth = 0; stage.classList.remove('drop');
+    if (e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]);
+  });
+})();
+</script>
+</body>
+</html>
