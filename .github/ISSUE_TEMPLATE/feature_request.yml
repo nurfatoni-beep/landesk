@@ -1,0 +1,20 @@
+name: Usulan fitur
+description: Ide untuk membuat LanDesk lebih berguna
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Masalah apa yang ingin diselesaikan?
+      placeholder: Contoh - di warnet saya sering perlu mematikan semua PC sekaligus...
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Usulan solusi
+  - type: textarea
+    id: context
+    attributes:
+      label: Konteks tambahan
+      description: Jumlah PC, jenis jaringan, screenshot, dll.

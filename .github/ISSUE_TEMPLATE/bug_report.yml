@@ -1,0 +1,52 @@
+name: Laporan bug
+description: Ada yang tidak berjalan sebagaimana mestinya
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Apa yang terjadi?
+      description: Jelaskan masalahnya dan apa yang seharusnya terjadi.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Langkah untuk mengulang
+      placeholder: |
+        1. Buka Dashboard
+        2. Klik dua kali kartu PC
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: Versi LanDesk
+      description: Lihat di judul jendela atau Pengaturan → Aplikasi.
+      placeholder: "1.3.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistem operasi
+      multiple: true
+      options:
+        - Windows 11
+        - Windows 10
+        - Ubuntu / Debian / Mint
+        - Lainnya
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Masalah terjadi di sisi
+      options:
+        - Komputer yang mengontrol (viewer / dashboard)
+        - Komputer yang dikontrol (host)
+        - Keduanya / tidak tahu
+  - type: textarea
+    id: log
+    attributes:
+      label: Log atau screenshot
+      description: Jangan sertakan password atau ID yang tidak ingin Anda bagikan.
